@@ -1,0 +1,7 @@
+Load from previous results from ./best_result_3/Humaneval/OP/OP_8B_O_4/samples_OP_8B_eval_results.json
+humaneval (base tests)
+pass@1:	0.624
+pass@10:	0.787
+humaneval+ (base + extra tests)
+pass@1:	0.555
+pass@10:	0.713

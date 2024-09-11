@@ -1,12 +1,49 @@
+from human_eval.data import write_jsonl, read_problems
 import requests
 from tqdm import tqdm
-from datasets import load_dataset
-from human_eval.data import write_jsonl
 
 import time
 import json
 
-code_templete = '''
+code_templete_so = '''
+{}
+
+Objectives:
+{}
+
+DO NOT generate any test cases or descriptions. Package your code in ```python ... ```.
+'''
+
+sub_prompt_so = '''
+{{specific objectives}}
+Write the independent objectives for solving the given problem concisely.
+
+{}
+
+Package your response in ```plaintext ... ```. DO NOT generate any code or description.
+'''
+
+code_templete_ps = '''
+{}
+
+Pseudo code:
+```
+{}
+```
+write a python code to solve the problem.
+DO NOT generate any test cases or descriptions. Package your code in ```python ... ```.
+'''
+
+sub_prompt_ps = '''
+{{specific pseudo code}}
+Write the pseudo code for solving the given problem.
+
+{}
+
+Package your response in ```plaintext ... ```. DO NOT generate any code or description.
+'''
+
+code_templete_pl = '''
 {}
 
 plan:
@@ -16,14 +53,12 @@ DO NOT generate any test cases or descriptions.
 Package your code in ```python ... ```.
 '''
 
-plan_prompt = '''
+sub_prompt_pl = '''
 {}
 
 Write a plan for the problem. 
 DO NOT generate any test cases or code. Package your response in ```plaintext ... ```.
 '''
-
-prompt = '"""\n{}\n\n{}\n"""\n'
 
 def extract(result, s):
     tmp = result[result.find(s) + len(s):]
@@ -48,7 +83,7 @@ def extract_class_text(result):
         return extract(result, "```\n")
     else:
         return -1
-    
+
 def llama_submit(prompt, url):
     url = "{}/v1/generateText".format(url)
 
@@ -60,41 +95,59 @@ def llama_submit(prompt, url):
     
     return result
 
-def generate_one_completion(prompt):
+def generate_one_completion(prompt, templet):
     norm_model = 'http://129.254.177.83:5002'
     greedy_model = 'http://129.254.177.83:5001'
     
-    result = llama_submit(plan_prompt.format(prompt), norm_model)
-    sub_tasks = extract_class_text(result)
-    if sub_tasks == -1:
-        while sub_tasks == -1:
-            result = llama_submit(plan_prompt.format(prompt), norm_model)
-            sub_tasks = extract_class_text(result)
+    res = []
+    for s, c in templet:
+        result = llama_submit(s.format(prompt), norm_model)
+        sub_tasks = extract_class_text(result)
+        if sub_tasks == -1:
+            while sub_tasks == -1:
+                result = llama_submit(s.format(prompt), norm_model)
+                sub_tasks = extract_class_text(result)
 
-    modified_code_result = llama_submit(code_templete.format(prompt, sub_tasks), greedy_model)
-    final_code = extract_class_code(modified_code_result)
-    if final_code == -1:
-        while final_code == -1:
-            result = llama_submit(plan_prompt.format(prompt), norm_model)
-            sub_tasks = extract_class_text(result)
-            modified_code_result = llama_submit(code_templete.format(prompt, sub_tasks), greedy_model)
-            final_code = extract_class_code(modified_code_result)
-            
-    return final_code, sub_tasks
+        modified_code_result = llama_submit(c.format(prompt, sub_tasks), greedy_model)
+        final_code = extract_class_code(modified_code_result)
+        if final_code == -1:
+            while final_code == -1:
+                result = llama_submit(s.format(prompt), norm_model)
+                sub_tasks = extract_class_text(result)
+                modified_code_result = llama_submit(c.format(prompt, sub_tasks), greedy_model)
+                final_code = extract_class_code(modified_code_result)
+        
+        res.append([sub_tasks, final_code])
+
+    return res
 
 
 from evalplus.data import get_mbpp_plus, write_jsonl
 
 num_samples_per_task = 10
 
-n_samples = []
-f_samples = []
+n_samples = [[] for _ in range(3)]
+f_samples = [[] for _ in range(3)]
 
+tmp = [[sub_prompt_so, code_templete_so], [sub_prompt_pl, code_templete_pl], [sub_prompt_ps, code_templete_ps]]
 for task_id, prob in tqdm(get_mbpp_plus().items()):
+    t1 = prob['canonical_solution'].split("\n")
+    t = ""
+    for line in t1:
+        if prob['entry_point'] in line:
+            t = t + "\n" + line
+            break
+        else:
+            t = t + "\n" + line
     for _ in range(num_samples_per_task):
-        n_code, f_code = generate_one_completion(prob['prompt'])
-        n_samples.append(dict(task_id=task_id, completion=n_code))
-        f_samples.append(dict(task_id=task_id, completion=f_code))
+        result = generate_one_completion(prob['prompt'] + t, tmp)
+        for n, d in enumerate(result):
+            n_samples[n].append(dict(task_id=task_id, completion=d[0]))
+            f_samples[n].append(dict(task_id=task_id, completion=d[1]))
 
-write_jsonl("mbpp_8OP.jsonl", n_samples)
-write_jsonl("mbpp_8OP_s.jsonl", f_samples)
+write_jsonl("mbpp_OP_8_s.jsonl", n_samples[0])
+write_jsonl("mbpp_OP_8.jsonl", f_samples[0])
+write_jsonl("mbpp_PL_8_s.jsonl", n_samples[1])
+write_jsonl("mbpp_PL_8.jsonl", f_samples[1])
+write_jsonl("mbpp_PS_8_s.jsonl", n_samples[2])
+write_jsonl("mbpp_PS_8.jsonl", f_samples[2])

@@ -96,8 +96,8 @@ def llama_submit(prompt, url):
     return result
 
 def generate_one_completion(prompt, templet):
-    norm_model = 'http://129.254.177.83:5002'
-    greedy_model = 'http://129.254.177.83:5001'
+    norm_model = 'http://129.254.177.85:5000'
+    greedy_model = 'http://129.254.177.85:5001'
     
     res = []
     for s, c in templet:
@@ -126,10 +126,10 @@ from evalplus.data import get_mbpp_plus, write_jsonl
 
 num_samples_per_task = 10
 
-n_samples = [[] for _ in range(3)]
-f_samples = [[] for _ in range(3)]
+n_samples = [[] for _ in range(2)]
+f_samples = [[] for _ in range(2)]
 
-tmp = [[sub_prompt_so, code_templete_so], [sub_prompt_pl, code_templete_pl], [sub_prompt_ps, code_templete_ps]]
+tmp = [[sub_prompt_pl, code_templete_pl], [sub_prompt_ps, code_templete_ps]]
 for task_id, prob in tqdm(get_mbpp_plus().items()):
     t1 = prob['canonical_solution'].split("\n")
     t = ""
@@ -145,9 +145,7 @@ for task_id, prob in tqdm(get_mbpp_plus().items()):
             n_samples[n].append(dict(task_id=task_id, completion=d[0]))
             f_samples[n].append(dict(task_id=task_id, completion=d[1]))
 
-write_jsonl("mbpp_OP_8_s.jsonl", n_samples[0])
-write_jsonl("mbpp_OP_8.jsonl", f_samples[0])
-write_jsonl("mbpp_PL_8_s.jsonl", n_samples[1])
-write_jsonl("mbpp_PL_8.jsonl", f_samples[1])
-write_jsonl("mbpp_PS_8_s.jsonl", n_samples[2])
-write_jsonl("mbpp_PS_8.jsonl", f_samples[2])
+write_jsonl("mbpp_PL_70_s.jsonl", n_samples[0])
+write_jsonl("mbpp_PL_70.jsonl", f_samples[0])
+write_jsonl("mbpp_PS_70_s.jsonl", n_samples[1])
+write_jsonl("mbpp_PS_70.jsonl", f_samples[1])

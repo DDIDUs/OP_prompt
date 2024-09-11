@@ -24,7 +24,7 @@ Write the independent objectives for solving the given problem concisely.
 Package your response in ```plaintext ... ```. DO NOT generate any code or description.
 '''
 
-prompt = '"""problem:\n{}\ntestcases\n{}\n"""\n'
+prompt = '"""\n{}\n\n{}\n"""\n'
 
 def mbpp_evaluate(solution_func, test_cases):
     all_passed = True
@@ -106,10 +106,21 @@ n_samples = []
 f_samples = []
 
 for task_id, prob in tqdm(get_mbpp_plus().items()):
+    tmp = prob['canonical_solution'].split("\n")
+
+    t = ""
+
+    for line in tmp:
+        if prob['entry_point'] in line:
+            t = t + "\n" + line
+            break
+        else:
+            t = t + "\n" + line
+
     for _ in range(num_samples_per_task):
-        n_code, f_code = generate_one_completion(prob['prompt'])
+        n_code, f_code = generate_one_completion(prob['prompt'] + t)
         n_samples.append(dict(task_id=task_id, completion=n_code))
         f_samples.append(dict(task_id=task_id, completion=f_code))
 
-write_jsonl("mbpp_70OP.jsonl", n_samples)
-write_jsonl("mbpp_70OP_s.jsonl", f_samples)
+write_jsonl("mbpp_OP.jsonl", n_samples)
+write_jsonl("mbpp_OP_s.jsonl", f_samples)
